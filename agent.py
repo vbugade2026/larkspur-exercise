@@ -47,8 +47,28 @@ EXTRA_TOOLS: List[Dict[str, Any]] = [    # ✏️ Build 2, step 2.1: schemas for
             "required": ["section"],
         },
     },
+    {
+        "name": "next_available_day",
+        "description": (
+            "Retrieve all available flights between specified origin and destination on "
+            "the next available day by checking seat availability. Returns the earliest "
+            "available flights."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "origin": {"type": "string"},
+                "dest": {"type": "string"},
+                "cabin": {"type": "string"},
+                "date": {"type": "string", "format": "date"},
+            },
+            "required": ["origin", "dest", "cabin", "date"],
+        },
+    },
 ]
-LOCAL_TOOLS: Dict[str, Any] = {}         # ✏️ Build 2, step 2.1: the functions behind them
+LOCAL_TOOLS: Dict[str, Any] = {           # ✏️ Build 2, step 2.1: the functions behind them
+    "next_available_day": next_available_day,
+}
 
 
 def fare_rules(section: str) -> str:
