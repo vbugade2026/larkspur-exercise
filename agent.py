@@ -9,6 +9,8 @@ Where you edit:   grep -n '✏' agent.py   (six marks, one per place)
 Steps and gates:  https://anthropicpartnerbasecamp.bts.com/
 """
 from __future__ import annotations
+import json
+from pathlib import Path
 from typing import Any, Dict, List
 from support import (MODEL, SYSTEM_PROMPT, call_local, execute_tool, mcp_client,
                      new_session, next_available_day, record_tool_result,
@@ -21,8 +23,63 @@ MAX_TOOL_CALLS = 8  # Larkspur's own build capped the loop here; then a human ta
 # Later-build extension points: extra instructions, tool schemas, and local
 # implementations. A schema tells Claude about a tool; it does not execute it.
 TONE_ADDENDUM = ""                       # ✏️ Build 4, step 4.1, intelligence goal
-EXTRA_TOOLS: List[Dict[str, Any]] = []   # ✏️ Build 2, step 2.1: schemas for the tools you add
-LOCAL_TOOLS: Dict[str, Any] = {}         # ✏️ Build 2, step 2.1: the functions behind them
+EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for the tools you add
+    {
+        "name": "reopen_stats",
+        "description": (
+            "How often a past disruption case like this one came back to Larkspur within "
+            "72 hours of being resolved, and why it came back. Drawn from a small sample of "
+            "human-handled chats. Use it when the customer worries that their problem will "
+            "come up again, or before you wrap up a case, so you can head off the usual "
+            "reasons for a repeat contact (for example, a confirmation that never arrived). "
+            "Call it after get_flight_status, passing that flight's status. It describes "
+            "past cases, not this customer's flight: do not present it as a prediction, "
+            "and always mention how small the sample is."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["CANCELLED", "DELAYED"],
+                    "description": "The disrupted flight's status, as returned by get_flight_status.",
+                },
+            },
+            "required": ["status"],
+        },
+    },
+]
+TRANSCRIPTS_PATH = Path(__file__).resolve().parent / "data" / "americas" / "transcripts_sample.jsonl"
+TRANSCRIPTS_SOURCE = "transcripts_sample.jsonl: human-handled chats, January storms"
+
+
+def reopen_stats(status: str) -> Dict[str, Any]:
+    """How many past chats with this flight status came back within 72 hours, and why.
+    Answers only from the transcripts file; says so when nothing matches."""
+    try:
+        with open(TRANSCRIPTS_PATH, encoding="utf-8") as f:
+            records = [json.loads(line) for line in f if line.strip()]
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"error": f"Could not read the transcripts sample: {exc}"}
+
+    matching = [r for r in records if r.get("disruption", {}).get("status") == status]
+    if not matching:
+        return {"status": status, "sample_size": 0,
+                "note": "No past chats with this status in the sample. Nothing to report."}
+
+    reopened = [r for r in matching if r.get("reopened_within_72h") is True]
+    return {
+        "status": status,
+        "sample_size": len(matching),
+        "reopened_within_72h": len(reopened),
+        "reopen_reasons": [r["reopen_reason"] for r in reopened if r.get("reopen_reason")],
+        "source": f"{TRANSCRIPTS_SOURCE} ({len(records)} in total)",
+    }
+
+
+LOCAL_TOOLS: Dict[str, Any] = {           # ✏️ Build 2, step 2.1: the functions behind them
+    "reopen_stats": reopen_stats,
+}
 
 
 def text_of(response) -> str:
