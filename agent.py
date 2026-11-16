@@ -48,6 +48,24 @@ EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for 
             "required": ["status"],
         },
     },
+    {
+        "name": "next_available_day",
+        "description": (
+            "Retrieve all available flights between specified origin and destination on "
+            "the next available day by checking seat availability. Returns the earliest "
+            "available flights."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "origin": {"type": "string"},
+                "dest": {"type": "string"},
+                "cabin": {"type": "string"},
+                "date": {"type": "string", "format": "date"},
+            },
+            "required": ["origin", "dest", "cabin", "date"],
+        },
+    },
 ]
 TRANSCRIPTS_PATH = Path(__file__).resolve().parent / "data" / "americas" / "transcripts_sample.jsonl"
 TRANSCRIPTS_SOURCE = "transcripts_sample.jsonl: human-handled chats, January storms"
@@ -79,6 +97,7 @@ def reopen_stats(status: str) -> Dict[str, Any]:
 
 LOCAL_TOOLS: Dict[str, Any] = {           # ✏️ Build 2, step 2.1: the functions behind them
     "reopen_stats": reopen_stats,
+    "next_available_day": next_available_day,
 }
 
 
