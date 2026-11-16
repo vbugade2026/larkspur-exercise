@@ -12,7 +12,7 @@ The review reads these names. Nothing else comes off the list. Your team still
 decides in the moment who does what.
 
 - Vaishnavi Bugade
-- Isaac
+- isaac boque carbonell
 - Youssef Medhat
 - Jordan Tan
 - Hamza Hanif
