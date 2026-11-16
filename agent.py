@@ -23,7 +23,31 @@ MAX_TOOL_CALLS = 8  # Larkspur's own build capped the loop here; then a human ta
 # Later-build extension points: extra instructions, tool schemas, and local
 # implementations. A schema tells Claude about a tool; it does not execute it.
 TONE_ADDENDUM = ""                       # ✏️ Build 4, step 4.1, intelligence goal
-EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for the tools you add
+EXTRA_TOOLS: List[Dict[str, Any]] = [
+    {
+        "name": "fare_rules",
+        "description": (
+            "Read Larkspur's Handbook rules when a customer asks why a fare benefit, "
+            "hotel, or other care is or is not covered. Unlike check_policy, this returns "
+            "general source text and does not decide what this customer is entitled to. "
+            "Provide the section number or a phrase from its title; it returns that "
+            "section verbatim from the Handbook excerpt."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "section": {
+                    "type": "string",
+                    "description": (
+                        "Handbook section to read: 4 for fare families, 5 for delays and "
+                        "cancellations, 6 for meals and hotels, or 7 for chat limits; "
+                        "you may also provide words from a section title."
+                    ),
+                },
+            },
+            "required": ["section"],
+        },
+    },
     {
         "name": "reopen_stats",
         "description": (
@@ -95,9 +119,55 @@ def reopen_stats(status: str) -> Dict[str, Any]:
     }
 
 
+def fare_rules(section: str) -> str:
+    """Return one numbered section from Larkspur's Handbook excerpt."""
+    path = Path(__file__).resolve().parent / "data" / "americas" / "fare_rules_excerpt.md"
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        return "Unable to read the fare rules excerpt at %s: %s" % (path, exc)
+
+    query = section.strip().lower()
+    if query.startswith("section "):
+        query = query[len("section "):]
+    query = query.rstrip(".")
+    sections = []
+    current = None
+    for line in lines:
+        if line.startswith("### "):
+            if current is not None:
+                sections.append(current)
+            heading = line[4:].strip()
+            number, separator, title = heading.partition(".")
+            current = {
+                "number": number.strip() if separator else "",
+                "title": title.strip() if separator else heading,
+                "text": [line],
+            }
+        elif current is not None:
+            current["text"].append(line)
+    if current is not None:
+        sections.append(current)
+
+    if not query:
+        available = ", ".join(
+            "%s (%s)" % (item["number"], item["title"]) for item in sections
+        )
+        return "A Handbook section is required. Available sections: %s." % available
+
+    for item in sections:
+        if query == item["number"] or query in item["title"].lower():
+            return "\n".join(item["text"]).strip()
+    available = ", ".join(
+        "%s (%s)" % (item["number"], item["title"]) for item in sections
+    )
+    return "No Handbook section matches %r. Available sections: %s." % (section, available)
+
+
 LOCAL_TOOLS: Dict[str, Any] = {           # ✏️ Build 2, step 2.1: the functions behind them
     "reopen_stats": reopen_stats,
     "next_available_day": next_available_day,
+    "fare_rules": fare_rules,
 }
 
 
