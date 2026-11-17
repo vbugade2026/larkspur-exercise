@@ -166,6 +166,7 @@ def run_agent(pnr: str, last_name: str, message: str) -> str:            # ‚úèÔ∏
     """Run the tool loop until Claude stops asking for tools. Return its final text."""
     client, tracer = new_session()
     tools = tool_list()
+    tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}
     # Each API call sends the conversation so far; it does not remember the
     # preceding request unless we include that history again.
     messages = [
@@ -175,7 +176,12 @@ def run_agent(pnr: str, last_name: str, message: str) -> str:            # ‚úèÔ∏
     # System instructions guide behavior; tools describe available actions.
     # Adaptive thinking can add non-text blocks to the returned content.
     response = client.messages.create(
-        model=MODEL, max_tokens=4096, system=runtime_preamble() + SYSTEM_PROMPT + TONE_ADDENDUM,
+        model=MODEL, max_tokens=4096,
+        system=[{
+            "type": "text",
+            "text": runtime_preamble() + SYSTEM_PROMPT + TONE_ADDENDUM,
+            "cache_control": {"type": "ephemeral"},
+        }],
         thinking={"type": "adaptive"}, tools=tools, messages=messages,
     )
 
@@ -190,7 +196,12 @@ def run_agent(pnr: str, last_name: str, message: str) -> str:            # ‚úèÔ∏
         # assistant message that requested them.
         messages.append({"role": "user", "content": tool_results(response)})
         response = client.messages.create(
-            model=MODEL, max_tokens=4096, system=runtime_preamble() + SYSTEM_PROMPT + TONE_ADDENDUM,
+            model=MODEL, max_tokens=4096,
+            system=[{
+                "type": "text",
+                "text": runtime_preamble() + SYSTEM_PROMPT + TONE_ADDENDUM,
+                "cache_control": {"type": "ephemeral"},
+            }],
             thinking={"type": "adaptive"}, tools=tools, messages=messages,
         )
         turns += 1
